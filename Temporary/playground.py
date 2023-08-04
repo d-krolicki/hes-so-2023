@@ -18,13 +18,21 @@ dataset = CanineLesionsDataset(
                 'lung consolidation', 'lipoma', 'subcutaneous mass',
                 'lung mass', 'interstitial pattern', "unidentified node"],
     spatial_transforms={
-        tio.RandomElasticDeformation() : 0.2,
-        tio.RandomAffine() : 0.8
-    },
+        # tio.RandomElasticDeformation() : 0.2,
+        # tio.RandomAffine() : 0.8
+        },
     transforms = {
-        tio.RescaleIntensity(out_min_max=(0, 1)) : 0.5
+        # tio.RescaleIntensity(out_min_max=(0, 1)) : 0.5
     }
 )
 
-print(dataset[0]['image'])
-print(dataset[0]['label'])
+for key in dataset[0]:
+    print(key)
+
+print(np.unique(dataset[0]['channel5'], return_counts=True))
+print(dataset[0]['image'].shape)
+print(dataset[0]['image'].orientation)
+print(dataset[0]['image'].spacing)
+print(dataset[0]['channel5'].shape)
+print(dataset[0]['channel5'].orientation)
+print(dataset[0]['channel5'].spacing)

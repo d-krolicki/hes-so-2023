@@ -339,7 +339,8 @@ def prepare_segmentation_masks(source_folderpath, classes_to_channels, custom_cl
     for i, filename in enumerate(filenames):
         t1 = time.time()
         reader.SetFileName(os.path.join(source_folderpath, "final-data", "all-checked", "segmentations", filename+".seg.nrrd"))
-        seg_arr = sitk.GetArrayFromImage(reader.Execute())
+        seg_original = reader.Execute()
+        seg_arr = sitk.GetArrayFromImage(seg_original)
         jsonfile = open(os.path.join(source_folderpath, "final-data", "all-checked", "seg-json", filename+".json"), "r")
         seg_json = json.load(jsonfile)
 
@@ -348,8 +349,12 @@ def prepare_segmentation_masks(source_folderpath, classes_to_channels, custom_cl
             for k1, v1 in seg_json['lesions'].items():  # iterate over lesions 
                 if k == k1:
                     arr = np.array((seg_arr==v1[0]).astype(int))
-            img_writer.SetFileName(os.path.join(source_folderpath, "final-data", "all-checked", "masks", filename, "Channel"+str(v)))
-            img_writer.Execute(sitk.GetImageFromArray(arr))
+            img_writer.SetFileName(os.path.join(source_folderpath, "final-data", "all-checked", "masks", filename, "Channel"+str(v)+".seg.nrrd"))
+            img = sitk.GetImageFromArray(arr)
+            img.SetSpacing(seg_original.GetSpacing())
+            img.SetOrigin(seg_original.GetOrigin())
+            img.SetDirection(seg_original.GetDirection())
+            img_writer.Execute(img)
         
         next_channel_index = len(classes_to_channels)
 
@@ -358,8 +363,12 @@ def prepare_segmentation_masks(source_folderpath, classes_to_channels, custom_cl
             for k1, v1 in seg_json['lesions'].items():
                 if custom_class == k1:
                     arr = np.array((seg_arr==0).astype(int))
-            img_writer.SetFileName(os.path.join(source_folderpath, "final-data", "all-checked", "masks", filename, "Channel"+str(next_channel_index)))
-            img_writer.Execute(sitk.GetImageFromArray(arr))
+            img_writer.SetFileName(os.path.join(source_folderpath, "final-data", "all-checked", "masks", filename, "Channel"+str(next_channel_index)+".seg.nrrd"))
+            img = sitk.GetImageFromArray(arr)
+            img.SetSpacing(seg_original.GetSpacing())
+            img.SetOrigin(seg_original.GetOrigin())
+            img.SetDirection(seg_original.GetDirection())
+            img_writer.Execute(img)
             next_channel_index += 1
         # for j in range(total_classes_count):    # iterate over all channels in image - all segmentation masks
         #     arr = np.zeros(seg_arr.shape)

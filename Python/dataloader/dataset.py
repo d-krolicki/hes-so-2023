@@ -22,10 +22,10 @@ class CanineLesionsDataset(Dataset):
         self.classes = classes
         self.spatial_transforms = spatial_transforms
         self.transforms = transforms
-        self.target_transforms = tio.Compose([
-            tio.OneOf(spatial_transforms, p=0.5),
-            tio.OneOf(self.transforms, p=0.5)
-        ])
+        # self.target_transforms = tio.Compose([
+        #     tio.OneOf(spatial_transforms, p=0.5),
+        #     tio.OneOf(self.transforms, p=0.5)
+        # ])
 
         self.reader = sitk.ImageFileReader()
     
@@ -37,27 +37,23 @@ class CanineLesionsDataset(Dataset):
         self.reader.SetFileName(os.path.join(self.image_dir, self.img_names[idx]))
         image = self.reader.Execute()
         image_tio = tio.ScalarImage.from_sitk(image)
-        tr = tio.transforms.ToCanonical()
-        image_tio_r = tr(image_tio)
 
         self.reader.SetImageIO("NrrdImageIO")
         
-        channels = []
-        for i, mask in enumerate(os.listdir(os.path.join(self.mask_dir, self.mask_names[idx]))):
-            self.reader.SetFileName(os.path.join(self.mask_dir, self.mask_names[idx], mask))
-            channel = np.transpose(sitk.GetArrayFromImage(self.reader.Execute()), (1, 2, 0))
-            channels.append(channel)
-
-        seg_tio = tio.LabelMap(tensor=torch.ShortTensor(np.array(channels)))
-
         subject = tio.Subject(
-            image = image_tio_r,
-            label = seg_tio
+            image = image_tio,
         )
 
-        subject_transformed = self.target_transforms(subject)
+        for i, mask in enumerate(os.listdir(os.path.join(self.mask_dir, self.mask_names[idx]))):
+            self.reader.SetFileName(os.path.join(self.mask_dir, self.mask_names[idx], mask))
+            subject.add_image(image=tio.LabelMap.from_sitk(self.reader.Execute()), image_name="channel"+str(i))
+        # seg_tio = tio.LabelMap(tensor=torch.ShortTensor(np.array(channels)))
 
-        return subject_transformed
+        
+
+        # subject_transformed = self.target_transforms(subject)
+
+        return subject
 
 
 

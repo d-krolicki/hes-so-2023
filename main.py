@@ -21,7 +21,7 @@ if testing:
 
 
 # Step 2
-sample_counts = utils.count_samples_in_classes(SOURCE_FOLDERPATH)
+# sample_counts = utils.count_samples_in_classes(SOURCE_FOLDERPATH)
 
 
 # Step 3
@@ -34,11 +34,11 @@ merged_classes, keywords_to_custom_classes, classes_to_channels = utils.merge_cl
                                                                         'lung mass', 'interstitial pattern'],
                                                                 custom_classes = ['unidentified node'],
                                                                 keywords = ['node'])
-print("=================================")
-print("======== Merged classes: ========")
-print("=================================")
-for k, v in merged_classes.items():
-    print(f"{k} : {v}")
+# print("=================================")
+# print("======== Merged classes: ========")
+# print("=================================")
+# for k, v in merged_classes.items():
+#     print(f"{k} : {v}")
 
 # print()
 # print()
@@ -49,7 +49,7 @@ for k, v in merged_classes.items():
 
 # Step 4
 
-utils.create_segmentation_info_json(SOURCE_FOLDERPATH, merged_classes, keywords_to_custom_classes, encoded_lesions)
+# utils.create_segmentation_info_json(SOURCE_FOLDERPATH, merged_classes, keywords_to_custom_classes, encoded_lesions)
 
 # Step 5
 
