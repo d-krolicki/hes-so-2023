@@ -8,6 +8,7 @@ import logging
 import json
 import time
 from Python.utils.utils import extract_diseases_in_image
+from typing import Tuple, List
 
 logging.basicConfig(level=logging.INFO)
 ch = logging.StreamHandler()
@@ -146,10 +147,8 @@ def check_origin_consistency(source_folderpath, loaded_data):
             img_writer.SetFileName(fileName=os.path.join(source_folderpath, "final-data", "origin-checked", "images", images[i]))
             img_writer.Execute(image)
 
-            img_writer.SetImageIO("NrrdImageIO")
-            img_writer.SetFileName(fileName=os.path.join(source_folderpath, "final-data", "origin-checked", "segmentations", segmentations[i]))
-            img_writer.UseCompressionOn()
-            img_writer.Execute(seg)
+            shutil.copy(os.path.join(source_folderpath, "correct_seg_nrrd_filtered", segmentations[i]), 
+                        os.path.join(source_folderpath, "final-data", "origin-checked", "segmentations"))
 
             inconsistent_origin += 1
     print()
@@ -304,6 +303,58 @@ def check_direction_consistency(source_folderpath, testing=False):
     return consistent_direction, inconsistent_direction
 
 
+def unify_spacings(source_folder_path:str, spacing:List[float] = [1.0, 1.0, 1.0]):
+    logger = logging.getLogger("unify_spacings")
+    logger.addHandler(ch)
+    logger.propagate = False
+
+    logging.info(f" Unifying spacings in the images and segmentations - chosen spacings: {spacing}")
+    # filenames = [os.path.splitext(filename)[0] for filename in sorted(os.listdir(os.path.join(source_folder_path, "final-data", "all-checked", "images")))]
+    filenames = [os.path.splitext(filename)[0] for filename in sorted(os.listdir(os.path.join(source_folder_path, "correct_mha")))]
+
+    l = len(filenames)
+    
+    img_reader = sitk.ImageFileReader()
+    
+    # resampler.SetInterpolator(sitk.sitkBSpline)
+    # resampler.SetOutputSpacing(spacing)
+
+    img_writer = sitk.ImageFileWriter()
+    img_writer.UseCompressionOn()
+    for i, filename in enumerate(filenames):
+        sys.stdout.write(f"\rProcessing image {i+1} / {l}")
+        sys.stdout.flush()
+
+        img_reader.SetImageIO("MetaImageIO")
+        img_reader.SetFileName(os.path.join(source_folder_path, "final-data-with-neutral-samples", "all-checked", "images", filename+".mha"))
+
+        image = img_reader.Execute()
+
+        original_spacing = image.GetSpacing()
+        original_size = image.GetSize()
+        new_size = [int(round(osz*ospc/nspc)) for osz,ospc,nspc in zip(original_size, original_spacing, spacing)]
+        image = sitk.Resample(image, new_size, sitk.Transform(), sitk.sitkBSpline, image.GetOrigin(), spacing, image.GetDirection(), 0, image.GetPixelID())
+        img_writer.SetFileName(os.path.join(source_folder_path, "final-data-with-neutral-samples", "all-checked", "unit-spacing-images", filename+".mha"))
+        img_writer.SetImageIO("MetaImageIO")
+        img_writer.Execute(image)
+
+        img_reader.SetImageIO("NrrdImageIO")
+        img_reader.SetFileName(os.path.join(source_folder_path, "final-data-with-neutral-samples", "all-checked", "segmentations", filename+".seg.nrrd"))
+
+        image = img_reader.Execute()
+
+        original_spacing = image.GetSpacing()
+        original_size = image.GetSize()
+        image = sitk.Resample(image, new_size, sitk.Transform(), sitk.sitkBSpline, image.GetOrigin(), spacing, image.GetDirection(), 0, image.GetPixelID())
+        img_writer.SetFileName(os.path.join(source_folder_path, "final-data-with-neutral-samples", "all-checked", "unit-spacing-segmentations", filename+".seg.nrrd"))
+        img_writer.SetImageIO("NrrdImageIO")
+        img_writer.Execute(image)
+
+    print()
+    logging.info(f" Spacings unified.")
+    return
+
+
 def prepare_segmentation_dirs(source_folderpath):
     logger = logging.getLogger("prepare_segmentation_dirs")
     logger.addHandler(ch)
@@ -362,7 +413,7 @@ def prepare_segmentation_masks(source_folderpath, classes_to_channels, custom_cl
             arr = np.zeros(seg_arr.shape)
             for k1, v1 in seg_json['lesions'].items():
                 if custom_class == k1:
-                    arr = np.array((seg_arr==0).astype(int))
+                    arr = np.array((seg_arr==v1[0]).astype(int))
             img_writer.SetFileName(os.path.join(source_folderpath, "final-data", "all-checked", "masks", filename, "Channel"+str(next_channel_index)+".seg.nrrd"))
             img = sitk.GetImageFromArray(arr)
             img.SetSpacing(seg_original.GetSpacing())

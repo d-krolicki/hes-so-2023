@@ -7,9 +7,13 @@ import logging
 import json
 import time
 import numpy as np
+import random
 import SimpleITK as sitk
+import csv
 
-from typing import Dict, Tuple, Optional
+
+from fuzzywuzzy import fuzz, process
+from typing import Dict, Tuple, Optional, List
 
 logging.basicConfig(level=logging.INFO)
 ch = logging.StreamHandler()
@@ -87,7 +91,7 @@ def get_empty_classes_dict(destination_folderpath:str, testing:bool=False) -> Di
         image = reader.Execute()
     
         for k in image.GetMetaDataKeys():
-            if re.match(r'^Segment\d_Name$', k):
+            if re.match(r'^Segment\d_Name$', k) and not re.match(r'^Segment_\d$', image.GetMetaData(k)):
                 classes_volumes[image.GetMetaData(k)] = 0
     print()
     logger.info(f" {len(classes_volumes)} different diseases discovered.")
@@ -159,6 +163,38 @@ def extract_diseases_in_image(seg:sitk.Image) -> Dict[int, str]:
     return labels_diseases
 
 
+def correct_typos_in_lesions_names(source_folder_path:str, classes:List) -> None:
+
+    logger = logging.getLogger("correct_typos_in_lesions_names")
+    logger.addHandler(ch)
+    logger.propagate = False
+
+    logger.info(f" Checking for typos in lesions names...")
+    img_reader = sitk.ImageFileReader()
+    img_reader.SetImageIO("NrrdImageIO")
+    l = sorted(os.listdir(os.path.join(source_folder_path, "correct_seg_nrrd")))
+    lenl = len(l)
+    for i, img in enumerate(l):
+        sys.stdout.write(f"\rChecking file {i+1} of {lenl}")
+        sys.stdout.flush()
+        img_reader.SetFileName(os.path.join(source_folder_path, "correct_seg_nrrd", img))
+        image = img_reader.Execute()
+        for k in image.GetMetaDataKeys():
+            if re.match(r'^Segment\d_Name$', k):
+                for c in classes:
+                    score = fuzz.ratio(image.GetMetaData(k), c)
+                    if score > 90:
+                        print(f"\nRenaming {image.GetMetaData(k)} to {c}")
+                        image[k] = c
+                        img_writer = sitk.ImageFileWriter()
+                        img_writer.UseCompressionOn()
+                        img_writer.SetImageIO("NrrdImageIO")
+                        img_writer.SetFileName(os.path.join(source_folder_path, "correct_seg_nrrd", img))
+                        img_writer.Execute(image)
+                        # print("Test finished.")
+                        # return None
+
+
 def count_samples_in_classes(source_folder_path:str) -> Dict[str, int]:
     """
     Counts the number of occurences of each lesion in the dataset.
@@ -188,7 +224,7 @@ def count_samples_in_classes(source_folder_path:str) -> Dict[str, int]:
         reader.SetFileName(os.path.join(source_folder_path, "correct_seg_nrrd", filename))
         image = reader.Execute()
         for k in image.GetMetaDataKeys():
-            if re.match(r'^Segment\d_Name$', k):
+            if re.match(r'^Segment\d_Name$', k) and not re.match(r'Segment_\d$', image.GetMetaData(k)):
                 dct[image.GetMetaData(k).lower()] += 1
     print()
     logger.info(f" {len(os.listdir(os.path.join(source_folder_path, 'correct_seg_nrrd')))} files scanned.")
@@ -429,4 +465,39 @@ def create_dataset_with_neutral_samples(source_folder_path, total_classes_count)
     logger.info(" Done.")
     return
 
-    
+
+def train_test_val_split(image_dir:str, csv_folder:str, from_list:bool=False, lst:List=None, val_size:float=0.1, test_size:float=0.2):
+    if from_list:
+        images = sorted(lst)
+    else:
+        images = sorted(os.listdir(image_dir))
+
+    indices = ([i for i in range(len(images))])
+    random.shuffle(indices)
+
+    no_vals = int(len(images)*val_size)
+    no_test = int(len(images)*test_size)
+
+    val_indices = indices[:no_vals]
+    test_indices = indices[no_vals:no_vals+no_test]
+    train_indices = indices[no_vals+no_test:]
+
+    train_images = [images[i] for i in train_indices]
+    val_images = [images[i] for i in val_indices]
+    test_images = [images[i] for i in test_indices]
+
+    with open(os.path.join(csv_folder, "train.csv"), "w+") as f:
+        writer = csv.writer(f, delimiter='#')
+        for name in train_images:
+            writer.writerow([name])
+        f.close()
+    with open(os.path.join(csv_folder, "validation.csv"), 'w+') as f:
+        writer = csv.writer(f, delimiter='#')
+        for name in val_images:
+            writer.writerow([name])
+        f.close()
+    with open(os.path.join(csv_folder, "test.csv"), 'w+') as f:
+        writer = csv.writer(f, delimiter='#')
+        for name in test_images:
+            writer.writerow([name])
+        f.close()

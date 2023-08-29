@@ -25,14 +25,15 @@ def extract_correct_files(source_folderpath):
     cnt_correct_mha = 0
     cnt_correct_seg = 0
     logger.info(" Extracting correct SEG and MHA files...")
-    for i, filename in enumerate(os.listdir(source_folderpath)):
+    ldir = os.listdir(source_folderpath)
+    for i, filename in enumerate(ldir):
         sys.stdout.write(f"\r{i+1} / {len(os.listdir(source_folderpath))}")
         sys.stdout.flush()
-        if not filename.startswith('.') and filename.endswith('.mha'):
+        if not filename.startswith('.') and filename.endswith('.mha') and os.path.splitext(filename)[0]+".seg.nrrd" in ldir:
             shutil.copy(os.path.join(source_folderpath, filename),
                         os.path.join(source_folderpath, "correct_mha" ,filename))
             cnt_correct_mha += 1
-        elif not filename.startswith('.') and filename.endswith('.seg.nrrd'):
+        elif not filename.startswith('.') and filename.endswith('.seg.nrrd') and os.path.splitext(os.path.splitext(filename)[0])[0]+".mha" in ldir:
             shutil.copy(os.path.join(source_folderpath, filename),
                         os.path.join(source_folderpath, "correct_seg_nrrd" ,filename))
             cnt_correct_seg += 1
